@@ -26,7 +26,7 @@ def start_fastapi_server():
     env["PYTHONPATH"] = os.path.abspath(".")
 
     process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
