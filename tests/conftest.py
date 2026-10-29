@@ -6,45 +6,59 @@ import pytest
 from playwright.sync_api import sync_playwright
 import requests
 
-@pytest.fixture(scope='session')
-def fastapi_server():
-    """
-    Fixture to start the FastAPI server before E2E tests and stop it after tests complete.
-    """
-    # Start FastAPI app
-    fastapi_process = subprocess.Popen(['python', 'main.py'])
-    
-    # Define the URL to check if the server is up
-    server_url = 'http://127.0.0.1:8000/'
-    
-    # Wait for the server to start by polling the root endpoint
+import subprocess
+import time
+import requests
+import pytest
+
+@pytest.fixture(scope="session", autouse=True)
+def start_fastapi_server():
+    # 1. Store the process instance in the 'process' variable
+    process = subprocess.Popen(
+        ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    server_url = "http://127.0.0.1:8000/"
     timeout = 30  # seconds
     start_time = time.time()
     server_up = False
-    
+
     print("Starting FastAPI server...")
-    
+
     while time.time() - start_time < timeout:
+        # 2. Check if the process died prematurely
+        if process.poll() is not None:
+            _, stderr = process.communicate()
+            raise RuntimeError(f"FastAPI server process died on startup:\n{stderr}")
+
         try:
             response = requests.get(server_url)
-            if response.status_code == 200:
+            if response.status_code < 500:
                 server_up = True
                 print("FastAPI server is up and running.")
                 break
         except requests.exceptions.ConnectionError:
             pass
+
         time.sleep(1)
-    
+
     if not server_up:
-        fastapi_process.terminate()
-        raise RuntimeError("FastAPI server failed to start within timeout period.")
-    
-    yield
-    
+        process.kill()
+        _, stderr = process.communicate()
+        raise RuntimeError(
+            f"FastAPI server failed to start within {timeout} seconds.\n"
+            f"Server output log:\n{stderr}"
+        )
+
+    yield process
+
     # Terminate FastAPI server
     print("Shutting down FastAPI server...")
-    fastapi_process.terminate()
-    fastapi_process.wait()
+    process.terminate()
+    process.wait()
     print("FastAPI server has been terminated.")
 
 @pytest.fixture(scope="session")
