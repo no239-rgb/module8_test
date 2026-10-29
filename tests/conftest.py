@@ -12,42 +12,35 @@ import time
 import requests
 import pytest
 
+import os
+import sys
+import time
+import subprocess
+import requests
+import pytest
+
 @pytest.fixture(scope="session", autouse=True)
 def start_fastapi_server():
-    # Include current directory in Python path
+    # Pass PYTHONPATH so Uvicorn can import 'app.main'
     env = os.environ.copy()
     env["PYTHONPATH"] = os.path.abspath(".")
 
     process = subprocess.Popen(
-        ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env=env  # <-- Pass env here
-    )
-    yield process
-    process.terminate()
-    process.wait()
-
-@pytest.fixture(scope="session", autouse=True)
-def start_fastapi_server():
-    # 1. Store the process instance in the 'process' variable
-    process = subprocess.Popen(
-        ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
+        env=env
     )
 
     server_url = "http://127.0.0.1:8000/"
-    timeout = 30  # seconds
+    timeout = 30
     start_time = time.time()
     server_up = False
 
     print("Starting FastAPI server...")
 
     while time.time() - start_time < timeout:
-        # 2. Check if the process died prematurely
         if process.poll() is not None:
             _, stderr = process.communicate()
             raise RuntimeError(f"FastAPI server process died on startup:\n{stderr}")
@@ -66,18 +59,16 @@ def start_fastapi_server():
     if not server_up:
         process.kill()
         _, stderr = process.communicate()
-        raise RuntimeError(
-            f"FastAPI server failed to start within {timeout} seconds.\n"
-            f"Server output log:\n{stderr}"
-        )
+        raise RuntimeError(f"FastAPI server failed to start within {timeout}s:\n{stderr}")
 
     yield process
 
-    # Terminate FastAPI server
-    print("Shutting down FastAPI server...")
     process.terminate()
-    process.wait()
-    print("FastAPI server has been terminated.")
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
 
 @pytest.fixture(scope="session")
 def playwright_instance_fixture():
