@@ -5,11 +5,29 @@ import time
 import pytest
 from playwright.sync_api import sync_playwright
 import requests
-
+import os
+import sys
 import subprocess
 import time
 import requests
 import pytest
+
+@pytest.fixture(scope="session", autouse=True)
+def start_fastapi_server():
+    # Include current directory in Python path
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.path.abspath(".")
+
+    process = subprocess.Popen(
+        ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env  # <-- Pass env here
+    )
+    yield process
+    process.terminate()
+    process.wait()
 
 @pytest.fixture(scope="session", autouse=True)
 def start_fastapi_server():
