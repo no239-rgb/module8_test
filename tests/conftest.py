@@ -1,27 +1,16 @@
 # tests/e2e/conftest.py
 
-import subprocess
+import os
+import sys
 import time
+import subprocess
+import requests
 import pytest
 from playwright.sync_api import sync_playwright
-import requests
-import os
-import sys
-import subprocess
-import time
-import requests
-import pytest
-
-import os
-import sys
-import time
-import subprocess
-import requests
-import pytest
 
 @pytest.fixture(scope="session", autouse=True)
 def start_fastapi_server():
-    # Pass PYTHONPATH so Uvicorn can import 'app.main'
+    # Pass PYTHONPATH so Uvicorn can import modules from the root directory
     env = os.environ.copy()
     env["PYTHONPATH"] = os.path.abspath(".")
 
@@ -46,12 +35,13 @@ def start_fastapi_server():
             raise RuntimeError(f"FastAPI server process died on startup:\n{stderr}")
 
         try:
-            response = requests.get(server_url)
+            # timeout=2 stops requests.get from hanging CI indefinitely if connection stalls
+            response = requests.get(server_url, timeout=2)
             if response.status_code < 500:
                 server_up = True
                 print("FastAPI server is up and running.")
                 break
-        except requests.exceptions.ConnectionError:
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             pass
 
         time.sleep(1)
