@@ -85,3 +85,7 @@ def page(browser):
     page = browser.new_page()
     yield page
     page.close()
+
+@pytest.fixture(scope="session")
+def fastapi_server(start_fastapi_server):
+    return start_fastapi_server
